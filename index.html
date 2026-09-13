@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Best By — expiry tracker</title>
+
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#2B2620">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Best By">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Space+Mono:wght@400;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
+<style>
+  :root{
+    --paper: #F1EAD9;
+    --paper-dark: #E5DBC3;
+    --ink: #2B2620;
+    --ink-soft: #5C5546;
+    --green: #4C6B4F;
+    --green-bg: #E4EBE1;
+    --amber: #B0701F;
+    --amber-bg: #F4E4C8;
+    --red: #A93B2E;
+    --red-bg: #EFDAD3;
+    --line: #2B2620;
+  }
+  *{box-sizing:border-box;}
+  @media (prefers-reduced-motion: reduce){
+    *{animation-duration:0.001ms !important; transition-duration:0.001ms !important;}
+  }
+  html, body{ height:100%; }
+  body{
+    margin:0;
+    background:
+      repeating-linear-gradient(0deg, rgba(43,38,32,0.02) 0px, rgba(43,38,32,0.02) 1px, transparent 1px, transparent 3px),
+      var(--paper);
+    color:var(--ink);
+    font-family:'Inter', sans-serif;
+    min-height:100vh;
+    display:flex;
+    justify-content:center;
+    padding:28px 14px calc(80px + env(safe-area-inset-bottom));
+    -webkit-tap-highlight-color:transparent;
+  }
+  .app{ width:100%; max-width:560px; }
+
+  .install-banner{
+    display:none;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    border:2px solid var(--line);
+    background:var(--ink);
+    color:var(--paper);
+    padding:10px 12px;
+    margin-bottom:16px;
+    font-size:13px;
+  }
+  .install-banner.show{ display:flex; }
+  .install-banner button{
+    background:var(--paper); color:var(--ink); border:none;
+    padding:7px 12px; font-weight:600; font-size:12.5px; cursor:pointer;
+  }
+  .install-banner .dismiss{ background:transparent; color:var(--paper); text-decoration:underline; padding:7px 4px; }
+
+  header.top{ margin-bottom:22px; }
+  h1{
+    font-family:'Archivo Black', sans-serif;
+    font-size:clamp(30px,7vw,40px);
+    margin:0 0 2px;
+    letter-spacing:-0.01em;
+    line-height:0.95;
+  }
+  .tagline{ color:var(--ink-soft); font-size:14.5px; margin:0; }
+
+  .stats{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin:22px 0 24px; }
+  .stat{
+    border:2px solid var(--line);
+    border-radius:999px;
+    text-align:center;
+    padding:12px 6px 10px;
+    background:var(--paper);
+    transform:rotate(-1.2deg);
+  }
+  .stat:nth-child(2){ transform:rotate(1deg); }
+  .stat:nth-child(3){ transform:rotate(-0.6deg); }
+  .stat .n{ font-family:'Space Mono', monospace; font-weight:700; font-size:24px; display:block; }
+  .stat .l{ font-size:10.5px; letter-spacing:0.06em; color:var(--ink-soft); text-transform:uppercase; }
+  .stat.fresh{ color:var(--green); border-color:var(--green); }
+  .stat.soon{ color:var(--amber); border-color:var(--amber); }
+  .stat.expired{ color:var(--red); border-color:var(--red); }
+
+  .banner{
+    border:2px dashed var(--red);
+    background:var(--red-bg);
+    color:var(--ink);
+    padding:12px 14px;
+    margin-bottom:20px;
+    font-size:14px;
+    display:none;
+  }
+  .banner.show{ display:block; }
+  .banner b{ font-family:'Space Mono', monospace; }
+
+  .add-toggle{
+    width:100%;
+    padding:14px;
+    font-family:'Archivo Black', sans-serif;
+    font-size:15px;
+    background:var(--ink);
+    color:var(--paper);
+    border:2px solid var(--ink);
+    cursor:pointer;
+    letter-spacing:0.02em;
+  }
+  .add-toggle:hover{ background:#3a332a; }
+
+  .add-panel{
+    border:2px solid var(--line);
+    border-top:none;
+    padding:18px;
+    display:none;
+    background:#fbf8f1;
+  }
+  .add-panel.show{ display:block; }
+  .field{ margin-bottom:14px; }
+  .field label{ display:block; font-size:12px; text-transform:uppercase; letter-spacing:0.06em; color:var(--ink-soft); margin-bottom:5px; }
+  .field input, .field select{
+    width:100%;
+    padding:10px 11px;
+    border:2px solid var(--line);
+    background:#fff;
+    font-family:'Inter',sans-serif;
+    font-size:15px;
+    color:var(--ink);
+  }
+  .field input:focus, .field select:focus{ outline:3px solid var(--amber); outline-offset:1px; }
+  .barcode-row{ display:flex; gap:8px; }
+  .barcode-row input{ flex:1; }
+  .btn{
+    padding:10px 14px;
+    border:2px solid var(--line);
+    background:var(--paper);
+    font-family:'Inter',sans-serif;
+    font-weight:600;
+    font-size:13.5px;
+    cursor:pointer;
+    white-space:nowrap;
+  }
+  .btn:hover{ background:var(--paper-dark); }
+  .btn:focus-visible, .add-toggle:focus-visible, .icon-btn:focus-visible{ outline:3px solid var(--amber); outline-offset:1px; }
+  .hint{ font-size:12.5px; color:var(--ink-soft); margin-top:5px; min-height:16px; }
+  .save-row{ display:flex; gap:10px; margin-top:6px; }
+  .save-row .btn.primary{ background:var(--green); color:#fff; border-color:var(--green); flex:1; }
+  .save-row .btn.primary:hover{ background:#3d5940; }
+  .save-row .btn.cancel{ flex:0 0 auto; }
+
+  .list{ margin-top:24px; display:flex; flex-direction:column; gap:14px; }
+  .item{
+    border:2px solid var(--line);
+    background:#fff;
+    position:relative;
+    padding:14px 14px 12px 16px;
+  }
+  .item.expired{ border-color:var(--red); background:var(--red-bg); }
+  .item.soon{ border-color:var(--amber); background:var(--amber-bg); }
+  .item.fresh{ border-color:var(--green); background:var(--green-bg); }
+  .item-top{ display:flex; justify-content:space-between; align-items:flex-start; gap:10px; }
+  .item-name{ font-family:'Archivo Black', sans-serif; font-size:16.5px; line-height:1.15; }
+  .item-actions{ display:flex; gap:6px; flex-shrink:0; }
+  .icon-btn{
+    border:2px solid var(--line);
+    background:#fff;
+    width:30px; height:30px;
+    font-size:14px;
+    cursor:pointer;
+    line-height:1;
+  }
+  .icon-btn:hover{ background:var(--paper-dark); }
+  .barcode-strip{ display:flex; align-items:center; gap:1.5px; margin:8px 0 6px; height:20px; opacity:0.55; }
+  .barcode-strip span{ display:inline-block; width:2px; background:var(--ink); height:100%; }
+  .barcode-num{ font-family:'Space Mono', monospace; font-size:11px; color:var(--ink-soft); letter-spacing:0.03em; }
+  .status-row{ display:flex; justify-content:space-between; align-items:baseline; margin-top:8px; font-size:13.5px; }
+  .status-text{ font-weight:600; }
+  .item.expired .status-text{ color:var(--red); }
+  .item.soon .status-text{ color:var(--amber); }
+  .item.fresh .status-text{ color:var(--green); }
+  .status-date{ font-family:'Space Mono', monospace; font-size:12.5px; color:var(--ink-soft); }
+
+  .edit-form{ margin-top:10px; padding-top:10px; border-top:1px dashed var(--ink-soft); display:none; }
+  .edit-form.show{ display:block; }
+
+  .empty{
+    text-align:center;
+    padding:40px 20px;
+    border:2px dashed var(--ink-soft);
+    color:var(--ink-soft);
+    font-size:14.5px;
+    margin-top:24px;
+  }
+
+  .overlay{
+    position:fixed; inset:0; background:rgba(20,17,13,0.94);
+    display:none; align-items:center; justify-content:center; flex-direction:column;
+    z-index:50; padding:20px;
+  }
+  .overlay.show{ display:flex; }
+  #scanner-container{
+    width:100%; max-width:420px; aspect-ratio: 4/3;
+    border:3px solid var(--paper); position:relative; overflow:hidden; background:#000;
+  }
+  #scanner-container video, #scanner-container canvas{
+    position:absolute; top:0; left:0; width:100%; height:100%; object-fit:cover;
+  }
+  .scan-target{
+    position:absolute; left:10%; right:10%; top:38%; bottom:38%;
+    border:2px solid var(--amber); pointer-events:none;
+  }
+  .overlay p{ color:var(--paper); font-size:14px; margin:14px 0; text-align:center; max-width:340px; }
+  .overlay .btn{ background:var(--paper); }
+
+  footer.note{ margin-top:30px; font-size:12px; color:var(--ink-soft); text-align:center; line-height:1.5; }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="install-banner" id="installBanner">
+    <span>Install Best By on your home screen for quick access.</span>
+    <span style="display:flex; gap:8px;">
+      <button id="installBtn">Install</button>
+      <button class="dismiss" id="dismissInstall">Not now</button>
+    </span>
+  </div>
+
+  <header class="top">
+    <h1>Best By</h1>
+    <p class="tagline">Track what's about to expire, before it does.</p>
+  </header>
+
+  <div class="stats">
+    <div class="stat fresh"><span class="n" id="statFresh">0</span><span class="l">Fresh</span></div>
+    <div class="stat soon"><span class="n" id="statSoon">0</span><span class="l">Soon</span></div>
+    <div class="stat expired"><span class="n" id="statExpired">0</span><span class="l">Expired</span></div>
+  </div>
+
+  <div class="banner" id="banner"></div>
+
+  <button class="add-toggle" id="addToggle">+ Add item</button>
+  <div class="add-panel" id="addPanel">
+    <div class="field">
+      <label for="barcodeInput">Barcode</label>
+      <div class="barcode-row">
+        <input type="text" id="barcodeInput" inputmode="numeric" placeholder="e.g. 5901234123457">
+        <button class="btn" id="scanBtn">Scan</button>
+      </div>
+      <div class="hint" id="barcodeHint">Scan with your camera, or type the number.</div>
+    </div>
+    <div class="field">
+      <label for="nameInput">Product name</label>
+      <input type="text" id="nameInput" placeholder="e.g. Whole Milk, 1L">
+    </div>
+    <div class="field">
+      <label for="dateInput">Expiry date</label>
+      <input type="date" id="dateInput">
+    </div>
+    <div class="save-row">
+      <button class="btn primary" id="saveBtn">Save item</button>
+      <button class="btn cancel" id="cancelBtn">Cancel</button>
+    </div>
+  </div>
+
+  <div class="list" id="list"></div>
+  <div class="empty" id="emptyState" style="display:none;">Nothing tracked yet. Scan or add your first product above.</div>
+
+  <footer class="note">Reminders appear here whenever you open Best By. Your items are stored on this device for your account only.</footer>
+</div>
+
+<div class="overlay" id="scanOverlay">
+  <div id="scanner-container"><div class="scan-target"></div></div>
+  <p id="scanStatus">Point your camera at a barcode.</p>
+  <button class="btn" id="scanCancel">Cancel</button>
+</div>
+
+<script>
+const STORE_KEY = 'bestby:items';
+const KNOWN_BARCODES = {
+  "5901234123457": "Whole Milk, 1L",
+  "8901030875798": "Greek Yogurt, 400g",
+  "0123456789012": "Sliced Bread, Wheat",
+  "4006381333931": "Butter, Salted 250g",
+  "3017620422003": "Chocolate Hazelnut Spread",
+  "5000112548167": "Baked Beans, 415g"
+};
+
+let items = [];
+
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+
+function daysUntil(dateStr){
+  const today = new Date();
+  today.setHours(0,0,0,0);
+  const target = new Date(dateStr + 'T00:00:00');
+  return Math.round((target - today) / 86400000);
+}
+
+function statusFor(days){
+  if(days < 0) return 'expired';
+  if(days <= 3) return 'soon';
+  return 'fresh';
+}
+
+function statusLabel(days){
+  if(days < 0) return `Expired ${Math.abs(days)} day${Math.abs(days)===1?'':'s'} ago`;
+  if(days === 0) return 'Expires today';
+  if(days === 1) return 'Expires tomorrow';
+  if(days <= 3) return `Expires in ${days} days`;
+  return `Fresh · ${days} days left`;
+}
+
+function formatDate(dateStr){
+  const d = new Date(dateStr + 'T00:00:00');
+  return d.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
+}
+
+function barcodeBars(code){
+  let s = '';
+  for(let i=0;i<28;i++){
+    const seed = (code.charCodeAt(i % code.length) || 50) + i;
+    const w = (seed % 3) + 1;
+    s += `<span style="width:${w}px"></span>`;
+  }
+  return s;
+}
+
+async function loadItems(){
+  try{
+    const res = await window.storage.get(STORE_KEY, false);
+    items = res ? JSON.parse(res.value) : [];
+  }catch(e){
+    items = [];
+  }
+  render();
+}
+
+async function persist(){
+  try{
+    await window.storage.set(STORE_KEY, JSON.stringify(items), false);
+  }catch(e){
+    console.error('Could not save', e);
+  }
+}
+
+function render(){
+  const list = document.getElementById('list');
+  const empty = document.getElementById('emptyState');
+  list.innerHTML = '';
+
+  empty.style.display = items.length === 0 ? 'block' : 'none';
+
+  const sorted = [...items].sort((a,b) => a.expiry.localeCompare(b.expiry));
+  let fresh=0, soon=0, expired=0;
+
+  sorted.forEach(item => {
+    const days = daysUntil(item.expiry);
+    const status = statusFor(days);
+    if(status==='fresh') fresh++; else if(status==='soon') soon++; else expired++;
+
+    const el = document.createElement('div');
+    el.className = `item ${status}`;
+    el.innerHTML = `
+      <div class="item-top">
+        <div class="item-name">${escapeHtml(item.name)}</div>
+        <div class="item-actions">
+          <button class="icon-btn" data-action="edit" data-id="${item.id}" aria-label="Edit ${escapeHtml(item.name)}">✎</button>
+          <button class="icon-btn" data-action="delete" data-id="${item.id}" aria-label="Remove ${escapeHtml(item.name)}">✕</button>
+        </div>
+      </div>
+      <div class="barcode-strip">${barcodeBars(item.barcode || '000000')}</div>
+      <div class="barcode-num">${item.barcode || 'no barcode'}</div>
+      <div class="status-row">
+        <span class="status-text">${statusLabel(days)}</span>
+        <span class="status-date">${formatDate(item.expiry)}</span>
+      </div>
+      <div class="edit-form" id="edit-${item.id}">
+        <div class="field">
+          <label>Product name</label>
+          <input type="text" class="edit-name" value="${escapeAttr(item.name)}">
+        </div>
+        <div class="field">
+          <label>Expiry date</label>
+          <input type="date" class="edit-date" value="${item.expiry}">
+        </div>
+        <div class="save-row">
+          <button class="btn primary" data-action="save-edit" data-id="${item.id}">Save changes</button>
+          <button class="btn cancel" data-action="cancel-edit" data-id="${item.id}">Cancel</button>
+        </div>
+      </div>
+    `;
+    list.appendChild(el);
+  });
+
+  document.getElementById('statFresh').textContent = fresh;
+  document.getElementById('statSoon').textContent = soon;
+  document.getElementById('statExpired').textContent = expired;
+
+  const banner = document.getElementById('banner');
+  const needsAttention = expired + soon;
+  if(needsAttention > 0){
+    banner.classList.add('show');
+    const parts = [];
+    if(expired>0) parts.push(`<b>${expired}</b> expired`);
+    if(soon>0) parts.push(`<b>${soon}</b> expiring within 3 days`);
+    banner.innerHTML = `⚠ ${parts.join(' · ')}. Check your list below.`;
+  } else {
+    banner.classList.remove('show');
+  }
+
+  attachListActions();
+}
+
+function escapeHtml(s){
+  return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function escapeAttr(s){ return escapeHtml(s); }
+
+function attachListActions(){
+  document.querySelectorAll('[data-action="delete"]').forEach(btn => {
+    btn.onclick = async () => {
+      items = items.filter(i => i.id !== btn.dataset.id);
+      await persist();
+      render();
+    };
+  });
+  document.querySelectorAll('[data-action="edit"]').forEach(btn => {
+    btn.onclick = () => {
+      document.querySelectorAll('.edit-form.show').forEach(f => f.classList.remove('show'));
+      document.getElementById(`edit-${btn.dataset.id}`).classList.add('show');
+    };
+  });
+  document.querySelectorAll('[data-action="cancel-edit"]').forEach(btn => {
+    btn.onclick = () => {
+      document.getElementById(`edit-${btn.dataset.id}`).classList.remove('show');
+    };
+  });
+  document.querySelectorAll('[data-action="save-edit"]').forEach(btn => {
+    btn.onclick = async () => {
+      const id = btn.dataset.id;
+      const form = document.getElementById(`edit-${id}`);
+      const name = form.querySelector('.edit-name').value.trim();
+      const date = form.querySelector('.edit-date').value;
+      if(!name || !date) return;
+      const item = items.find(i => i.id === id);
+      item.name = name;
+      item.expiry = date;
+      await persist();
+      render();
+    };
+  });
+}
+
+// Add panel
+const addToggle = document.getElementById('addToggle');
+const addPanel = document.getElementById('addPanel');
+addToggle.onclick = () => {
+  addPanel.classList.toggle('show');
+  addToggle.textContent = addPanel.classList.contains('show') ? '– Close' : '+ Add item';
+};
+document.getElementById('cancelBtn').onclick = () => {
+  clearForm();
+  addPanel.classList.remove('show');
+  addToggle.textContent = '+ Add item';
+};
+
+function clearForm(){
+  document.getElementById('barcodeInput').value = '';
+  document.getElementById('nameInput').value = '';
+  document.getElementById('dateInput').value = '';
+  document.getElementById('barcodeHint').textContent = "Scan with your camera, or type the number.";
+}
+
+document.getElementById('barcodeInput').addEventListener('input', (e) => {
+  const code = e.target.value.trim();
+  const hint = document.getElementById('barcodeHint');
+  const nameField = document.getElementById('nameInput');
+  if(KNOWN_BARCODES[code]){
+    nameField.value = KNOWN_BARCODES[code];
+    hint.textContent = 'Recognized product — name filled in, edit if needed.';
+  } else if(code.length >= 8){
+    hint.textContent = "New barcode — enter the product name.";
+  } else {
+    hint.textContent = "Scan with your camera, or type the number.";
+  }
+});
+
+document.getElementById('saveBtn').onclick = async () => {
+  const barcode = document.getElementById('barcodeInput').value.trim();
+  const name = document.getElementById('nameInput').value.trim();
+  const expiry = document.getElementById('dateInput').value;
+  if(!name || !expiry){
+    document.getElementById('barcodeHint').textContent = 'Add a product name and an expiry date to save.';
+    return;
+  }
+  items.push({ id: uid(), barcode, name, expiry });
+  await persist();
+  clearForm();
+  addPanel.classList.remove('show');
+  addToggle.textContent = '+ Add item';
+  render();
+};
+
+// --- Barcode scanning via Quagga (works across Chrome, Safari/iOS, Firefox) ---
+let scannerRunning = false;
+
+document.getElementById('scanBtn').onclick = () => {
+  const overlay = document.getElementById('scanOverlay');
+  const status = document.getElementById('scanStatus');
+  overlay.classList.add('show');
+  status.textContent = 'Starting camera…';
+
+  if(typeof Quagga === 'undefined'){
+    status.textContent = "Scanner library didn't load — check your connection, or type the barcode instead.";
+    return;
+  }
+
+  Quagga.init({
+    inputStream: {
+      type: 'LiveStream',
+      target: document.querySelector('#scanner-container'),
+      constraints: { facingMode: 'environment', width: 640, height: 480 }
+    },
+    locator: { patchSize: 'medium', halfSample: true },
+    numOfWorkers: 2,
+    frequency: 10,
+    decoder: {
+      readers: ['ean_reader', 'ean_8_reader', 'upc_reader', 'upc_e_reader', 'code_128_reader']
+    },
+    locate: true
+  }, (err) => {
+    if(err){
+      status.textContent = "Couldn't access the camera. Close this and type the barcode instead.";
+      console.error(err);
+      return;
+    }
+    Quagga.start();
+    scannerRunning = true;
+    status.textContent = 'Point your camera at a barcode.';
+  });
+
+  Quagga.onDetected(onBarcodeDetected);
+};
+
+function onBarcodeDetected(result){
+  const code = result && result.codeResult && result.codeResult.code;
+  if(!code) return;
+  document.getElementById('barcodeInput').value = code;
+  document.getElementById('barcodeInput').dispatchEvent(new Event('input'));
+  stopScan();
+}
+
+function stopScan(){
+  if(scannerRunning){
+    try{ Quagga.offDetected(onBarcodeDetected); Quagga.stop(); }catch(e){}
+    scannerRunning = false;
+  }
+  document.getElementById('scanOverlay').classList.remove('show');
+}
+
+document.getElementById('scanCancel').onclick = stopScan;
+
+// --- PWA install prompt ---
+let deferredPrompt = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  document.getElementById('installBanner').classList.add('show');
+});
+document.getElementById('installBtn').onclick = async () => {
+  document.getElementById('installBanner').classList.remove('show');
+  if(deferredPrompt){
+    deferredPrompt.prompt();
+    await deferredPrompt.userChoice;
+    deferredPrompt = null;
+  }
+};
+document.getElementById('dismissInstall').onclick = () => {
+  document.getElementById('installBanner').classList.remove('show');
+};
+
+if('serviceWorker' in navigator){
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch((e) => console.error('SW registration failed', e));
+  });
+}
+
+loadItems();
+</script>
+</body>
+</html>
